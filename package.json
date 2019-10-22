@@ -1,9 +1,10 @@
 {
-  "name": "react-list",
+  "name": "@teselagen/react-list",
   "version": "0.8.13",
   "author": "Casey Foster <c@sey.me>",
   "license": "MIT",
   "main": "react-list.js",
+  "description": "teselagen maintained fork of Casey Foster's react-list component",
   "repository": {
     "type": "git",
     "url": "https://github.com/coderiety/react-list"

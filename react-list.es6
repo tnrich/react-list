@@ -1,5 +1,12 @@
-import React, { Component } from 'react';
+/* eslint-disable no-empty */
+/* eslint-disable no-cond-assign */
+/* eslint-disable no-cond-assign */
+/* eslint-disable default-case */
+/* eslint-disable default-case */
+/* eslint-disable no-cond-assign */
+// import module from 'module';
 import PropTypes from 'prop-types';
+import React from 'react';
 
 const CLIENT_SIZE_KEYS = { x: 'clientWidth', y: 'clientHeight' };
 const CLIENT_START_KEYS = { x: 'clientTop', y: 'clientLeft' };
@@ -9,7 +16,7 @@ const OFFSET_START_KEYS = { x: 'offsetLeft', y: 'offsetTop' };
 const OVERFLOW_KEYS = { x: 'overflowX', y: 'overflowY' };
 const SCROLL_SIZE_KEYS = { x: 'scrollWidth', y: 'scrollHeight' };
 const SCROLL_START_KEYS = { x: 'scrollLeft', y: 'scrollTop' };
-const SIZE_KEYS = { x: 'width', y: 'height' };
+const SIZE_KEYS = { x: 'minWidth', y: 'minHeight' };
 
 const NOOP = () => {};
 
@@ -35,7 +42,7 @@ const PASSIVE = (() => {
   : false;
 
 const UNSTABLE_MESSAGE = 'ReactList failed to reach a stable state.';
-const MAX_SYNC_UPDATES = 50;
+const MAX_SYNC_UPDATES = 100;
 
 const isEqualSubset = (a, b) => {
   for (const key in b) if (a[key] !== b[key]) return false;
@@ -43,50 +50,7 @@ const isEqualSubset = (a, b) => {
   return true;
 };
 
-const defaultScrollParentGetter = component => {
-  const { axis } = component.props;
-  let el = component.getEl();
-  const overflowKey = OVERFLOW_KEYS[axis];
-  while ((el = el.parentElement)) {
-    switch (window.getComputedStyle(el)[overflowKey]) {
-      case 'auto':
-      case 'scroll':
-      case 'overlay':
-        return el;
-    }
-  }
-  return window;
-};
-
-const defaultScrollParentViewportSizeGetter = component => {
-  const { axis } = component.props;
-  const { scrollParent } = component;
-  return scrollParent === window
-    ? window[INNER_SIZE_KEYS[axis]]
-    : scrollParent[CLIENT_SIZE_KEYS[axis]];
-};
-
-const constrain = (props, state) => {
-  const { length, minSize, type } = props;
-  let { from, size, itemsPerRow } = state;
-  size = Math.max(size, minSize);
-  let mod = size % itemsPerRow;
-  if (mod) size += itemsPerRow - mod;
-  if (size > length) size = length;
-  from =
-    type === 'simple' || !from ? 0 : Math.max(Math.min(from, length - size), 0);
-
-  if ((mod = from % itemsPerRow)) {
-    from -= mod;
-    size += mod;
-  }
-
-  if (from === state.from && size == state.size) return state;
-
-  return { ...state, from, size };
-};
-
-module.exports = class ReactList extends Component {
+export default class ReactList extends React.Component {
   static displayName = 'ReactList';
 
   static propTypes = {
@@ -100,7 +64,6 @@ module.exports = class ReactList extends Component {
     minSize: PropTypes.number,
     pageSize: PropTypes.number,
     scrollParentGetter: PropTypes.func,
-    scrollParentViewportSizeGetter: PropTypes.func,
     threshold: PropTypes.number,
     type: PropTypes.oneOf(['simple', 'variable', 'uniform']),
     useStaticSize: PropTypes.bool,
@@ -114,43 +77,41 @@ module.exports = class ReactList extends Component {
     length: 0,
     minSize: 1,
     pageSize: 10,
-    scrollParentGetter: defaultScrollParentGetter,
-    scrollParentViewportSizeGetter: defaultScrollParentViewportSizeGetter,
     threshold: 100,
     type: 'simple',
     useStaticSize: false,
     useTranslate3d: false
   };
 
-  static getDerivedStateFromProps(props, state) {
-    const newState = constrain(props, state);
-    return newState === state ? null : newState;
-  }
-
   constructor(props) {
     super(props);
-    this.state = constrain(props, {
-      itemsPerRow: 1,
-      from: props.initialIndex,
-      size: 0
-    });
+    const { initialIndex } = props;
+    const itemsPerRow = 1;
+    const { from, size } = this.constrain(initialIndex, 0, itemsPerRow, props);
+    this.state = { from, size, itemsPerRow };
     this.cache = {};
-    this.cachedScrollPosition = null;
     this.prevPrevState = {};
     this.unstable = false;
     this.updateCounter = 0;
   }
 
+  //tnr: commenting this out.. not sure if it is actually needed.. ? the 
+  // UNSAFE_componentWillReceiveProps(nextProps) {
+  //   let { from, size, itemsPerRow } = this.state;
+  //   if (nextProps.clearCache) this.cache = {};
+  //   this.maybeSetState(
+  //     this.constrain(from, size, itemsPerRow, nextProps),
+  //     NOOP
+  //   );
+  // }
+
   componentDidMount() {
-    this.updateFrameAndClearCache = this.updateFrameAndClearCache.bind(this);
-    window.addEventListener('resize', this.updateFrameAndClearCache);
+    this.updateFrame = this.updateFrame.bind(this);
+    window.addEventListener('resize', this.updateFrame);
     this.updateFrame(this.scrollTo.bind(this, this.props.initialIndex));
   }
 
-  componentDidUpdate(prevProps) {
-    // Viewport scroll is no longer useful if axis changes
-    if (this.props.axis !== prevProps.axis) this.clearSizeCache();
-
+  componentDidUpdate() {
     // If the list has reached an unstable state, prevent an infinite loop.
     if (this.unstable) return;
 
@@ -165,23 +126,44 @@ module.exports = class ReactList extends Component {
         delete this.updateCounterTimeoutId;
       }, 0);
     }
-
+    // this.dontUpdate = true;
     this.updateFrame();
-  }
 
+    //TNR: extra code to 'fix' the scroll height when scrolling upwards
+    //tnr commenting this out because we are now doing a better job of calculating row heights
+    // if (this.rowToFixScroll) {
+    //   const { row, cache: previousSize } = this.rowToFixScroll;
+    //   const actualSize = this.cache[row];
+    //   if (actualSize && actualSize !== previousSize) {
+    //     this.getScrollParent().scrollBy({
+    //       top: -(
+    //         (previousSize || this.props.itemSizeEstimator(row, {})) - actualSize
+    //       )
+    //     });
+    //     this.rowToFixScroll = null;
+    //   }
+    // }
+  }
+  // shouldComponentUpdate() {
+  //   if (this.dontUpdate) {
+  //     this.dontUpdate = false;
+  //     return false;
+  //   }
+  //   return true;
+  // }
   maybeSetState(b, cb) {
     if (isEqualSubset(this.state, b)) return cb();
 
+    //TNR: extra code to 'fix' the scroll height when scrolling upwards
+    if (this.state.from === b.from + 1) {
+      this.rowToFixScroll = { row: b.from, cache: this.cache[b.from] };
+    }
     this.setState(b, cb);
   }
 
   componentWillUnmount() {
-    window.removeEventListener('resize', this.updateFrameAndClearCache);
-    this.scrollParent.removeEventListener(
-      'scroll',
-      this.updateFrameAndClearCache,
-      PASSIVE
-    );
+    window.removeEventListener('resize', this.updateFrame);
+    this.scrollParent.removeEventListener('scroll', this.updateFrame, PASSIVE);
     this.scrollParent.removeEventListener('mousewheel', NOOP, PASSIVE);
   }
 
@@ -198,11 +180,24 @@ module.exports = class ReactList extends Component {
     return this.el || this.items;
   }
 
-  getScrollPosition() {
-    // Cache scroll position as this causes a forced synchronous layout.
-    if (typeof this.cachedScrollPosition === 'number') {
-      return this.cachedScrollPosition;
+  getScrollParent() {
+    const { axis, scrollParentGetter } = this.props;
+    if (scrollParentGetter) return scrollParentGetter();
+    let el = this.getEl();
+    if (!el) return window;
+    const overflowKey = OVERFLOW_KEYS[axis];
+    while ((el = el.parentElement)) {
+      switch (window.getComputedStyle(el)[overflowKey]) {
+        case 'auto':
+        case 'scroll':
+        case 'overlay':
+          return el;
+      }
     }
+    return window;
+  }
+
+  getScrollPosition() {
     const { scrollParent } = this;
     const { axis } = this.props;
     const scrollKey = SCROLL_START_KEYS[axis];
@@ -213,13 +208,10 @@ module.exports = class ReactList extends Component {
           // whichever has a value.
           document.body[scrollKey] || document.documentElement[scrollKey]
         : scrollParent[scrollKey];
-    const max =
-      this.getScrollSize() - this.props.scrollParentViewportSizeGetter(this);
+    const max = this.getScrollSize() - this.getViewportSize();
     const scroll = Math.max(0, Math.min(actual, max));
     const el = this.getEl();
-    this.cachedScrollPosition =
-      this.getOffset(scrollParent) + scroll - this.getOffset(el);
-    return this.cachedScrollPosition;
+    return this.getOffset(scrollParent) + scroll - this.getOffset(el);
   }
 
   setScroll(offset) {
@@ -230,6 +222,14 @@ module.exports = class ReactList extends Component {
 
     offset -= this.getOffset(this.scrollParent);
     scrollParent[SCROLL_START_KEYS[axis]] = offset;
+  }
+
+  getViewportSize() {
+    const { scrollParent } = this;
+    const { axis } = this.props;
+    return scrollParent === window
+      ? window[INNER_SIZE_KEYS[axis]]
+      : scrollParent[CLIENT_SIZE_KEYS[axis]];
   }
 
   getScrollSize() {
@@ -249,8 +249,7 @@ module.exports = class ReactList extends Component {
   getStartAndEnd(threshold = this.props.threshold) {
     const scroll = this.getScrollPosition();
     const start = Math.max(0, scroll - threshold);
-    let end =
-      scroll + this.props.scrollParentViewportSizeGetter(this) + threshold;
+    let end = scroll + this.getViewportSize() + threshold;
     if (this.hasDeterminateSize()) {
       end = Math.min(end, this.getSpaceBefore(this.props.length));
     }
@@ -286,26 +285,15 @@ module.exports = class ReactList extends Component {
       let item = itemEls[itemsPerRow];
       item && item[startKey] === firstStart;
       item = itemEls[itemsPerRow]
-    ) {
+    )
       ++itemsPerRow;
-    }
 
     return { itemSize, itemsPerRow };
   }
 
-  clearSizeCache() {
-    this.cachedScrollPosition = null;
-  }
-
-  // Called by 'scroll' and 'resize' events, clears scroll position cache.
-  updateFrameAndClearCache(cb) {
-    this.clearSizeCache();
-    return this.updateFrame(cb);
-  }
-
   updateFrame(cb) {
     this.updateScrollParent();
-    if (typeof cb != 'function') cb = NOOP;
+    if (typeof cb !== 'function') cb = NOOP;
     switch (this.props.type) {
       case 'simple':
         return this.updateSimpleFrame(cb);
@@ -318,21 +306,16 @@ module.exports = class ReactList extends Component {
 
   updateScrollParent() {
     const prev = this.scrollParent;
-    this.scrollParent = this.props.scrollParentGetter(this);
+    if (prev) {
+      return; //https://github.com/coderiety/react-list/pull/196
+    }
+    this.scrollParent = this.getScrollParent();
     if (prev === this.scrollParent) return;
     if (prev) {
-      prev.removeEventListener('scroll', this.updateFrameAndClearCache);
+      prev.removeEventListener('scroll', this.updateFrame);
       prev.removeEventListener('mousewheel', NOOP);
     }
-    // If we have a new parent, cached parent dimensions are no longer useful.
-    this.clearSizeCache();
-    this.scrollParent.addEventListener(
-      'scroll',
-      this.updateFrameAndClearCache,
-      PASSIVE
-    );
-    // You have to attach mousewheel listener to the scrollable element.
-    // Just an empty listener. After that onscroll events will be fired synchronously.
+    this.scrollParent.addEventListener('scroll', this.updateFrame, PASSIVE);
     this.scrollParent.addEventListener('mousewheel', NOOP, PASSIVE);
   }
 
@@ -386,22 +369,22 @@ module.exports = class ReactList extends Component {
       space += itemSize;
       ++size;
     }
-
     this.maybeSetState({ from, size }, cb);
   }
 
   updateUniformFrame(cb) {
-    const { itemSize, itemsPerRow } = this.getItemSizeAndItemsPerRow();
+    let { itemSize, itemsPerRow } = this.getItemSizeAndItemsPerRow();
 
     if (!itemSize || !itemsPerRow) return cb();
 
     const { start, end } = this.getStartAndEnd();
 
-    const { from, size } = constrain(this.props, {
-      from: Math.floor(start / itemSize) * itemsPerRow,
-      size: (Math.ceil((end - start) / itemSize) + 1) * itemsPerRow,
-      itemsPerRow
-    });
+    const { from, size } = this.constrain(
+      Math.floor(start / itemSize) * itemsPerRow,
+      (Math.ceil((end - start) / itemSize) + 1) * itemsPerRow,
+      itemsPerRow,
+      this.props
+    );
 
     return this.maybeSetState({ itemsPerRow, from, itemSize, size }, cb);
   }
@@ -434,6 +417,7 @@ module.exports = class ReactList extends Component {
   cacheSizes() {
     const { cache } = this;
     const { from } = this.state;
+    if (!this.items) return;
     const itemEls = this.items.children;
     const sizeKey = OFFSET_SIZE_KEYS[this.props.axis];
     for (let i = 0, l = itemEls.length; i < l; ++i) {
@@ -465,21 +449,37 @@ module.exports = class ReactList extends Component {
     if (itemSizeEstimator) return itemSizeEstimator(index, cache);
   }
 
+  constrain(from, size, itemsPerRow, { length, minSize, type }) {
+    size = Math.max(size, minSize);
+    let mod = size % itemsPerRow;
+    if (mod) size += itemsPerRow - mod;
+    if (size > length) size = length;
+    from =
+      type === 'simple' || !from
+        ? 0
+        : Math.max(Math.min(from, length - size), 0);
+
+    if ((mod = from % itemsPerRow)) {
+      from -= mod;
+      size += mod;
+    }
+
+    return { from, size };
+  }
+
   scrollTo(index) {
-    if (index != null) this.setScroll(this.getSpaceBefore(index));
+    if (index != null) this.setScroll(this.getSpaceBefore(index) - 100);
   }
 
   scrollAround(index) {
     const current = this.getScrollPosition();
     const bottom = this.getSpaceBefore(index);
-    const top =
-      bottom -
-      this.props.scrollParentViewportSizeGetter(this) +
-      this.getSizeOfItem(index);
+    const top = bottom - this.getViewportSize() + this.getSizeOfItem(index);
     const min = Math.min(top, bottom);
     const max = Math.max(top, bottom);
-    if (current <= min) return this.setScroll(min);
-    if (current > max) return this.setScroll(max);
+    if (current <= min) return this.setScroll(min - this.getViewportSize());
+    if (current > max)
+      return this.setScroll(max - this.getViewportSize() - 100);
   }
 
   getVisibleRange() {
@@ -495,6 +495,23 @@ module.exports = class ReactList extends Component {
     }
     return [first, last];
   }
+  //this can be used as a static method via the react list ref
+  getFractionalVisibleRange() {
+    const { from, size } = this.state;
+    const { start, end } = this.getStartAndEnd(0);
+    const cache = {};
+    let first, last;
+
+    for (let i = from; i < from + size; ++i) {
+      const itemStart = this.getSpaceBefore(i, cache);
+      const itemEnd = itemStart + this.getSizeOfItem(i);
+      if (first == null && itemEnd > start)
+        first = i + 1 - (itemEnd - start) / (itemEnd - itemStart);
+      if (first != null && itemStart < end)
+        last = i - (itemEnd - end) / (itemEnd - itemStart);
+    }
+    return [first, last];
+  }
 
   renderItems() {
     const { itemRenderer, itemsRenderer } = this.props;
@@ -505,9 +522,8 @@ module.exports = class ReactList extends Component {
   }
 
   render() {
-    const { axis, length, type, useTranslate3d } = this.props;
+    const { axis, length, type /* useTranslate3d */ } = this.props;
     const { from, itemsPerRow } = this.state;
-
     const items = this.renderItems();
     if (type === 'simple') return items;
 
@@ -522,16 +538,19 @@ module.exports = class ReactList extends Component {
     const offset = this.getSpaceBefore(from, cache);
     const x = axis === 'x' ? offset : 0;
     const y = axis === 'y' ? offset : 0;
-    const transform = useTranslate3d
-      ? `translate3d(${x}px, ${y}px, 0)`
-      : `translate(${x}px, ${y}px)`;
     const listStyle = {
-      msTransform: transform,
-      WebkitTransform: transform,
-      transform
+      //tnr trying out: https://github.com/coderiety/react-list/pull/154
+      position: 'relative',
+      top: y,
+      left: x
     };
     return (
-      <div style={style} ref={c => (this.el = c)}>
+      <div
+        style={style}
+        ref={c => {
+          if (c) this.el = c;
+        }}
+      >
         <div style={listStyle}>{items}</div>
       </div>
     );
