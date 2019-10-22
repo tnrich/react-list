@@ -30585,18 +30585,23 @@ Cogs.define("react-list.js", function (COGS_REQUIRE, COGS_REQUIRE_ASYNC, module,
       _this.unstable = false;
       _this.updateCounter = 0;
       return _this;
-    } //tnr: commenting this out.. not sure if it is actually needed
-    // UNSAFE_componentWillReceiveProps(nextProps) {
-    //   let { from, size, itemsPerRow } = this.state;
-    //   if (nextProps.clearCache) this.cache = {};
-    //   this.maybeSetState(
-    //     this.constrain(from, size, itemsPerRow, nextProps),
-    //     NOOP
-    //   );
-    // }
+    } //tnr: I tried commenting this out but found it caused errors with
+    //itemRenderer being called with outdated items. For example when going from
+    //a datatable with 50 rows and scrolled to the bottom to just 10 rows, the datatable
+    //would throw an error trying to render a row (11-50) that no longer existed
 
 
     _createClass(ReactList, [{
+      key: "UNSAFE_componentWillReceiveProps",
+      value: function UNSAFE_componentWillReceiveProps(nextProps) {
+        var _this$state = this.state,
+            from = _this$state.from,
+            size = _this$state.size,
+            itemsPerRow = _this$state.itemsPerRow;
+        if (nextProps.clearCache) this.cache = {};
+        this.maybeSetState(this.constrain(from, size, itemsPerRow, nextProps), NOOP);
+      }
+    }, {
       key: "componentDidMount",
       value: function componentDidMount() {
         this.updateFrame = this.updateFrame.bind(this);
@@ -30780,9 +30785,9 @@ Cogs.define("react-list.js", function (COGS_REQUIRE, COGS_REQUIRE_ASYNC, module,
         var _this$props3 = this.props,
             axis = _this$props3.axis,
             useStaticSize = _this$props3.useStaticSize;
-        var _this$state = this.state,
-            itemSize = _this$state.itemSize,
-            itemsPerRow = _this$state.itemsPerRow;
+        var _this$state2 = this.state,
+            itemSize = _this$state2.itemSize,
+            itemsPerRow = _this$state2.itemsPerRow;
 
         if (useStaticSize && itemSize && itemsPerRow) {
           return {
@@ -30950,9 +30955,9 @@ Cogs.define("react-list.js", function (COGS_REQUIRE, COGS_REQUIRE_ASYNC, module,
         var cache = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
         if (cache[index] != null) return cache[index]; // Try the static itemSize.
 
-        var _this$state2 = this.state,
-            itemSize = _this$state2.itemSize,
-            itemsPerRow = _this$state2.itemsPerRow;
+        var _this$state3 = this.state,
+            itemSize = _this$state3.itemSize,
+            itemsPerRow = _this$state3.itemsPerRow;
 
         if (itemSize) {
           return cache[index] = Math.floor(index / itemsPerRow) * itemSize;
@@ -31002,10 +31007,10 @@ Cogs.define("react-list.js", function (COGS_REQUIRE, COGS_REQUIRE_ASYNC, module,
             itemSizeGetter = _this$props6.itemSizeGetter,
             itemSizeEstimator = _this$props6.itemSizeEstimator,
             type = _this$props6.type;
-        var _this$state3 = this.state,
-            from = _this$state3.from,
-            itemSize = _this$state3.itemSize,
-            size = _this$state3.size; // Try the static itemSize.
+        var _this$state4 = this.state,
+            from = _this$state4.from,
+            itemSize = _this$state4.itemSize,
+            size = _this$state4.size; // Try the static itemSize.
 
         if (itemSize) return itemSize; // Try the itemSizeGetter.
 
@@ -31065,9 +31070,9 @@ Cogs.define("react-list.js", function (COGS_REQUIRE, COGS_REQUIRE_ASYNC, module,
     }, {
       key: "getVisibleRange",
       value: function getVisibleRange() {
-        var _this$state4 = this.state,
-            from = _this$state4.from,
-            size = _this$state4.size;
+        var _this$state5 = this.state,
+            from = _this$state5.from,
+            size = _this$state5.size;
 
         var _this$getStartAndEnd4 = this.getStartAndEnd(0),
             start = _this$getStartAndEnd4.start,
@@ -31089,9 +31094,9 @@ Cogs.define("react-list.js", function (COGS_REQUIRE, COGS_REQUIRE_ASYNC, module,
     }, {
       key: "getFractionalVisibleRange",
       value: function getFractionalVisibleRange() {
-        var _this$state5 = this.state,
-            from = _this$state5.from,
-            size = _this$state5.size;
+        var _this$state6 = this.state,
+            from = _this$state6.from,
+            size = _this$state6.size;
 
         var _this$getStartAndEnd5 = this.getStartAndEnd(0),
             start = _this$getStartAndEnd5.start,
@@ -31123,9 +31128,9 @@ Cogs.define("react-list.js", function (COGS_REQUIRE, COGS_REQUIRE_ASYNC, module,
         var _this$props7 = this.props,
             itemRenderer = _this$props7.itemRenderer,
             itemsRenderer = _this$props7.itemsRenderer;
-        var _this$state6 = this.state,
-            from = _this$state6.from,
-            size = _this$state6.size;
+        var _this$state7 = this.state,
+            from = _this$state7.from,
+            size = _this$state7.size;
         var items = [];
 
         for (var i = 0; i < size; ++i) {
@@ -31145,9 +31150,9 @@ Cogs.define("react-list.js", function (COGS_REQUIRE, COGS_REQUIRE_ASYNC, module,
             axis = _this$props8.axis,
             length = _this$props8.length,
             type = _this$props8.type;
-        var _this$state7 = this.state,
-            from = _this$state7.from,
-            itemsPerRow = _this$state7.itemsPerRow;
+        var _this$state8 = this.state,
+            from = _this$state8.from,
+            itemsPerRow = _this$state8.itemsPerRow;
         var items = this.renderItems();
         if (type === 'simple') return items;
         var style = {

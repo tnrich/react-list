@@ -95,15 +95,18 @@ export default class ReactList extends React.Component {
     this.updateCounter = 0;
   }
 
-  //tnr: commenting this out.. not sure if it is actually needed
-  // UNSAFE_componentWillReceiveProps(nextProps) {
-  //   let { from, size, itemsPerRow } = this.state;
-  //   if (nextProps.clearCache) this.cache = {};
-  //   this.maybeSetState(
-  //     this.constrain(from, size, itemsPerRow, nextProps),
-  //     NOOP
-  //   );
-  // }
+  //tnr: I tried commenting this out but found it caused errors with
+  //itemRenderer being called with outdated items. For example when going from
+  //a datatable with 50 rows and scrolled to the bottom to just 10 rows, the datatable
+  //would throw an error trying to render a row (11-50) that no longer existed
+  UNSAFE_componentWillReceiveProps(nextProps) {
+    const { from, size, itemsPerRow } = this.state;
+    if (nextProps.clearCache) this.cache = {};
+    this.maybeSetState(
+      this.constrain(from, size, itemsPerRow, nextProps),
+      NOOP
+    );
+  }
 
   componentDidMount() {
     this.updateFrame = this.updateFrame.bind(this);
