@@ -95,7 +95,7 @@ export default class ReactList extends React.Component {
     this.updateCounter = 0;
   }
 
-  //tnr: commenting this out.. not sure if it is actually needed.. ? the 
+  //tnr: commenting this out.. not sure if it is actually needed
   // UNSAFE_componentWillReceiveProps(nextProps) {
   //   let { from, size, itemsPerRow } = this.state;
   //   if (nextProps.clearCache) this.cache = {};
@@ -285,8 +285,9 @@ export default class ReactList extends React.Component {
       let item = itemEls[itemsPerRow];
       item && item[startKey] === firstStart;
       item = itemEls[itemsPerRow]
-    )
+    ) {
       ++itemsPerRow;
+    }
 
     return { itemSize, itemsPerRow };
   }
@@ -373,7 +374,7 @@ export default class ReactList extends React.Component {
   }
 
   updateUniformFrame(cb) {
-    let { itemSize, itemsPerRow } = this.getItemSizeAndItemsPerRow();
+    const { itemSize, itemsPerRow } = this.getItemSizeAndItemsPerRow();
 
     if (!itemSize || !itemsPerRow) return cb();
 
@@ -478,8 +479,9 @@ export default class ReactList extends React.Component {
     const min = Math.min(top, bottom);
     const max = Math.max(top, bottom);
     if (current <= min) return this.setScroll(min - this.getViewportSize());
-    if (current > max)
+    if (current > max) {
       return this.setScroll(max - this.getViewportSize() - 100);
+    }
   }
 
   getVisibleRange() {
@@ -505,10 +507,12 @@ export default class ReactList extends React.Component {
     for (let i = from; i < from + size; ++i) {
       const itemStart = this.getSpaceBefore(i, cache);
       const itemEnd = itemStart + this.getSizeOfItem(i);
-      if (first == null && itemEnd > start)
+      if (first == null && itemEnd > start) {
         first = i + 1 - (itemEnd - start) / (itemEnd - itemStart);
-      if (first != null && itemStart < end)
+      }
+      if (first != null && itemStart < end) {
         last = i - (itemEnd - end) / (itemEnd - itemStart);
+      }
     }
     return [first, last];
   }
@@ -555,4 +559,4 @@ export default class ReactList extends React.Component {
       </div>
     );
   }
-};
+}
