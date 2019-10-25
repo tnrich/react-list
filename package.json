@@ -9,6 +9,7 @@
     "type": "git",
     "url": "https://github.com/coderiety/react-list"
   },
+  "private": false,
   "dependencies": {
     "prop-types": "15"
   },
